@@ -1,0 +1,99 @@
+#lang typed/racket
+
+(require "../uchicago151/uchicago151.rkt")
+(require "../uchicago151/uc151image.rkt")
+(require "../uchicago151/uc151universe.rkt")
+(require "chess-logic.rkt")
+(require "../uchicago151/chess-logic-checks.rkt")
+(require typed/test-engine/racket-tests)
+
+;; Dims is a structure to contain integer dimensions.
+(define-struct Dims
+  ([width  : Integer]
+   [height : Integer]))
+
+(define-struct (Sized T)
+  ([t    : T]
+   [dims : Dims]))
+
+(define-type (Reporter T)
+  (T -> String))
+
+;; Using a board instead of a CellField
+
+;; The quit? Boolean in a ChessWorld is false initially.
+;; A "q" key action flips quit? to true
+;; and indicates that the user wants to quit.
+(define-struct ChessWorld
+  ([game : (Sized ChessGame)]
+   [info  : (Sized (Reporter ChessGame))]
+   [select : (Option Loc)]
+   [quit? : Boolean]))
+
+(: chessrep (ChessGame -> String))
+;; Reporter function for a chess world, stating in-check? and
+;; whose turn it is
+(define (chessrep game)
+  (string-append
+   (symbol->string (ChessGame-turn game))
+   " | "
+   (cond
+     [(checkmate? game) "Checkmate!"]
+     [(stalemate? game) "Stalemate!"]
+     [(in-check? game) "In Check"]
+     [else ""])))
+
+(: new-chessworld (ChessGame Dims Dims -> CellWorld))
+;; Create a new chess world given the dimensions in pixels of the cell field
+;; and the dimensions in pixels of the report area.
+(define (new-chessworld game sizeb sizer)
+  (ChessWorld
+   (Sized game sizeb)
+   (Sized chessrep sizer)
+   'None #f))
+
+(: handle-click (ChessWorld Integer Integer Mouse-Event -> ChessWorld))
+;; Select a piece for moving, move a piece, or deselect a piece
+;; You need only react to the "button-down" mouse event.
+(define (handle-click cw x y me)
+  (match* (cw me)
+    [((ChessWorld sgame srep select q) "button-down")
+     (
+    [(_ _) cw]))
+
+(: draw-cell-world (CellWorld -> Image))
+;; Draw the cell field, and immediately underneath it the report area.
+;; Use the cell field reporter to generate a fresh report (string)
+;; on every draw action.
+(define (draw-cell-world cw)
+  (match cw
+    [(CellWorld scf rscf q)
+     (above/align "left"
+     (draw-cellfield
+      (Sized-t scf)
+      (Sized-dims scf)
+      (length (Sized-t scf))
+      (length (first (Sized-t scf))))
+     (overlay
+      (text ((Sized-t rscf) (Sized-t scf)) 12 "black")
+      (rectangle
+       (Dims-width (Sized-dims rscf))
+       (Dims-height (Sized-dims rscf))
+       "solid" "gray")))]))
+
+(: main (Integer Integer (Reporter CellField) Dims Dims -> CellWorld))
+;; Runs big-bang and the program
+(define (main r c rcf dcf dr)
+  (cond
+    [(or
+      (< r 1)
+      (< c 1)) (error "rows/columns out of bounds")]
+    [else
+     (big-bang (new-cell-world r c rcf dcf dr) : CellWorld
+      [to-draw draw-cell-world]
+      [on-mouse handle-click]
+      [on-key handle-key]
+      [name "Cell World Simulator"]
+      [stop-when CellWorld-quit?])]))
+                  
+(test)
